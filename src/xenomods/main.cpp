@@ -14,6 +14,7 @@
 #include "xenomods/engine/ml/Filesystem.hpp"
 #include "xenomods/engine/ml/Rand.hpp"
 #include "xenomods/stuff/utils/debug_util.hpp"
+#include "xenomods/engine/gf/Party.hpp"
 
 namespace {
 
@@ -51,6 +52,8 @@ namespace {
 #endif
 
 } // namespace
+
+std::ofstream logfile;
 
 namespace xenomods {
 
@@ -114,6 +117,87 @@ void fmt_assert_failed(const char* file, int line, const char* message) {
 		/*
 		 * Check buttons
 		 */
+		static int logging = -1;
+		
+		if (P1->InputDownStrict(RECORD_JUMPS))
+		{
+			g_Logger->ToastInfo("record", "start recording jumps");
+			logging = 0;
+			logfile.open("sd:/skylinetest.log", std::ofstream::out);
+		}
+		else if (P1->InputDownStrict(SAVE_JUMPS))
+		{
+			g_Logger->ToastInfo("record", "save recording jumps");
+			logging = -1;
+			logfile.close();
+		}
+		{
+			gf::GfComTransform* trans = gf::GfGameParty::getLeaderTransform();
+			if (trans != nullptr) {
+				mm::Vec3* pos = trans->getPosition();
+				mm::Quat* rot = trans->getRotation();
+
+				if (pos != nullptr && rot != nullptr) {
+					glm::vec3 realPos = *pos;
+					glm::quat realRot = *rot;
+					auto q = realRot;
+					double angle = atan2(q.x, q.z)*2 * 180.0 / M_PI;
+					if (angle < 0.0) angle += 360.0;
+
+					double roll = atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y));
+					double pitch = -M_PI / 2 + atan2(sqrt(1 + 2 * (q.w * q.y - q.x * q.z)), sqrt(1 - 2 * (q.w * q.y - q.x * q.z)));
+					double yaw = atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
+
+					glm::vec3 forward = mm::Vec3::unitZ;
+					forward = static_cast<glm::quat&>(*rot) * forward;;
+
+					// custom function
+					g_Logger->ToastInfo("Testpos", "Pos: ({:.6f}, {:.6f}, {:.6f})  Dir: x: {:.6f}", realPos.x, realPos.y, realPos.z, angle);
+					// g_Logger->ToastInfo("Testpos", "Pos: {}  Dir: x: {:.3f}, y: {:.3f}, z: {:.3f}, w: {:.3f}, roll: {:.3f}, pitch: {:.3f}, yaw: {:.3f}", realPos, realRot.x, realRot.y, realRot.z, realRot.w, roll, pitch, yaw);
+					fw::debug::drawFontFmtShadow3D(realPos, mm::Col4::white, "{}", realPos);
+					fw::debug::drawCompareZ(false);
+					fw::debug::drawArrow(realPos, realPos + forward, mm::Col4::red);
+
+
+					if (P1->InputDown(nn::hid::KEY_B) && logging <= 0)
+					{
+						logging = 23;
+					}
+					if (logging > 0)
+					{
+						logging--;
+						logfile << realPos.x << ", " << realPos.y << ", " << realPos.z << "\t\t" << angle << "\n";
+						if (logging == 0)
+						{
+							if (realPos.x < 376.5)
+							{
+								logfile << "clip";
+							}
+							else
+							{
+								logfile << "no clip";
+							}
+							logfile << std::endl;
+						}
+					}
+					// target.setup(static_cast<mm::Vec3>(point), 1);
+					// fw::debug::drawSphere(target, mm::Col4::green, 1);
+					fw::PrimSphere target;
+					glm::vec3 point = {376.629, 273.984, 101.224};
+					point.x = 376.629;
+					point.y = 273.984;
+					point.z = 101.224;
+					// target.setup(point, 0.2);
+					// fw::debug::drawSphere(target, mm::Col4::white, 100);
+					target.setup(point, 0.05);
+					fw::debug::drawSphere(target, mm::Col4::green, 10);
+					// fw::debug::drawArrow(realPos, point, mm::Col4::green);
+					fw::debug::drawCompareZ(true);
+
+				}
+			}
+		}
+
 
 		if(P2->InputDownStrict(DISPLAY_VERSION)) {
 			toastVersion();
